@@ -12,35 +12,55 @@ pub fn setup_graphics(mut commands: Commands) {
     });
 }
 
-pub fn setup_physics(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-    mut images: ResMut<Assets<Image>>,
+fn setup_cube(
+    commands: &mut Commands,
+    meshes: &mut ResMut<Assets<Mesh>>,
+    material: &Handle<StandardMaterial>,
 ) {
-    let debug_material = materials.add(StandardMaterial {
-        base_color_texture: Some(images.add(uv_debug_texture())),
-        ..default()
-    });
-    /* Create the ground. */
-    commands
-        .spawn(Collider::cuboid(50.0, 0.1, 50.0))
-        .insert(TransformBundle::from(Transform::from_xyz(0.0, -2.0, 0.0)));
-
-    /* Create the bouncing ball. */
+    let cube_size = Vec3::new(0.5, 0.5, 0.5);
     commands
         .spawn(RigidBody::Dynamic)
         .insert((
-            Collider::cuboid(0.5, 0.5, 0.5),
+            Collider::cuboid(cube_size.x, cube_size.y, cube_size.z),
             PbrBundle {
-                mesh: meshes.add(shape::Cube::default().into()),
-                material: debug_material.clone(),
+                mesh: meshes.add(Mesh::from(shape::Cube {
+                    size: cube_size.x * 2.,
+                })),
+                material: material.clone(),
                 ..default()
             },
         ))
         .insert(Restitution::coefficient(0.7))
         .insert(TransformBundle::from(Transform::from_xyz(0.0, 4.0, 0.0)));
+}
 
+fn setup_ground(
+    commands: &mut Commands,
+    meshes: &mut ResMut<Assets<Mesh>>,
+    material: &Handle<StandardMaterial>,
+) {
+    let ground_size = Vec3::new(50., 0.1, 50.);
+
+    commands
+        .spawn((
+            Collider::cuboid(ground_size.x, ground_size.y, ground_size.z),
+            PbrBundle {
+                mesh: meshes.add(Mesh::from(shape::Box {
+                    min_x: -ground_size.x,
+                    max_x: ground_size.x,
+                    min_y: -ground_size.y,
+                    max_y: ground_size.y,
+                    min_z: -ground_size.z,
+                    max_z: ground_size.z,
+                })),
+                material: material.clone(),
+                ..default()
+            },
+        ))
+        .insert(TransformBundle::from(Transform::from_xyz(0.0, -2.0, 0.0)));
+}
+
+fn setup_light(commands: &mut Commands) {
     commands.spawn(PointLightBundle {
         point_light: PointLight {
             intensity: 9000.0,
@@ -52,29 +72,25 @@ pub fn setup_physics(
         ..default()
     });
 }
-fn uv_debug_texture() -> Image {
-    const TEXTURE_SIZE: usize = 8;
 
-    let mut palette: [u8; 32] = [
-        255, 102, 159, 255, 255, 159, 102, 255, 236, 255, 102, 255, 121, 255, 102, 255, 102, 255,
-        198, 255, 102, 198, 255, 255, 121, 102, 255, 255, 236, 102, 255, 255,
-    ];
+pub fn setup_physics(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    server: Res<AssetServer>,
+) {
+    let ground_handle: Handle<Image> = server.load("textures/debug_ground.png");
+    let ground_material = materials.add(StandardMaterial {
+        base_color_texture: Some(ground_handle),
+        ..default()
+    });
+    let cube_handle: Handle<Image> = server.load("textures/debug_square.png");
+    let cube_material = materials.add(StandardMaterial {
+        base_color_texture: Some(cube_handle),
+        ..default()
+    });
 
-    let mut texture_data = [0; TEXTURE_SIZE * TEXTURE_SIZE * 4];
-    for y in 0..TEXTURE_SIZE {
-        let offset = TEXTURE_SIZE * y * 4;
-        texture_data[offset..(offset + TEXTURE_SIZE * 4)].copy_from_slice(&palette);
-        palette.rotate_right(4);
-    }
-
-    Image::new_fill(
-        Extent3d {
-            width: TEXTURE_SIZE as u32,
-            height: TEXTURE_SIZE as u32,
-            depth_or_array_layers: 1,
-        },
-        TextureDimension::D2,
-        &texture_data,
-        TextureFormat::Rgba8UnormSrgb,
-    )
+    setup_ground(&mut commands, &mut meshes, &ground_material);
+    setup_cube(&mut commands, &mut meshes, &cube_material);
+    setup_light(&mut commands);
 }
