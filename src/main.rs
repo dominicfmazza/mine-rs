@@ -1,54 +1,64 @@
-//! This example demonstrates the built-in 3d shapes in Bevy.
-//! The scene includes a patterned texture and a rotation for visualizing the normals and UVs.
-
-use std::f32::consts::PI;
-
 use bevy::{
     prelude::*,
     render::render_resource::{Extent3d, TextureDimension, TextureFormat},
 };
+use bevy_rapier3d::prelude::*;
 
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest()))
-        .add_systems(Startup, setup)
-        .add_systems(Update, rotate)
+        .add_plugins((
+            DefaultPlugins.set(ImagePlugin::default_nearest()),
+            RapierPhysicsPlugin::<NoUserData>::default(),
+            RapierDebugRenderPlugin::default(),
+        ))
+        .add_systems(Startup, (setup_graphics, setup_physics))
+        .add_systems(Update, print_ball_altitude)
+        // .add_systems(Update, (update_player_position, handle_player_input))
         .run();
 }
 
-/// A marker component for our shapes so we can query them separately from the ground plane
 #[derive(Component)]
-struct Shape;
+struct Player {
+    movement_speed: f32,
+    velocity: Vec2,
+}
 
-const X_EXTENT: f32 = 14.5;
+fn setup_graphics(mut commands: Commands) {
+    // Add a camera so we can see the debug-render.
+    commands.spawn(Camera3dBundle {
+        transform: Transform::from_xyz(20.0, 20.0, 10.0).looking_at(Vec3::ZERO, Vec3::Y),
+        ..Default::default()
+    });
+}
 
-fn setup(
+fn setup_physics(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
-    mut images: ResMut<Assets<Image>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    mut images: ResMut<Assets<Image>>,
 ) {
     let debug_material = materials.add(StandardMaterial {
         base_color_texture: Some(images.add(uv_debug_texture())),
         ..default()
     });
+    /* Create the ground. */
+    commands
+        .spawn(Collider::cuboid(50.0, 0.1, 50.0))
+        .insert(TransformBundle::from(Transform::from_xyz(0.0, -2.0, 0.0)));
 
-    let shapes = [meshes.add(shape::Cube::default().into())];
-
-    let num_shapes = shapes.len();
-
-    for (i, shape) in shapes.into_iter().enumerate() {
-        commands.spawn((
+    /* Create the bouncing ball. */
+    commands
+        .spawn(RigidBody::Dynamic)
+        .insert((
+            Collider::cuboid(0.5, 0.5, 0.5),
             PbrBundle {
-                mesh: shape,
+                mesh: meshes.add(shape::Cube::default().into()),
                 material: debug_material.clone(),
-                transform: Transform::from_xyz(-X_EXTENT / 4f32, 2.0, 0.0)
-                    .with_rotation(Quat::from_rotation_x(-PI / 4.)),
                 ..default()
             },
-            Shape,
-        ));
-    }
+        ))
+        .insert(Restitution::coefficient(0.7))
+        .insert(TransformBundle::from(Transform::from_xyz(0.0, 4.0, 0.0)));
 
     commands.spawn(PointLightBundle {
         point_light: PointLight {
@@ -60,26 +70,13 @@ fn setup(
         transform: Transform::from_xyz(8.0, 16.0, 8.0),
         ..default()
     });
-
-    // ground plane
-    commands.spawn(PbrBundle {
-        mesh: meshes.add(shape::Plane::from_size(50.0).into()),
-        material: materials.add(Color::SILVER.into()),
-        ..default()
-    });
-
-    commands.spawn(Camera3dBundle {
-        transform: Transform::from_xyz(0.0, 6., 12.0).looking_at(Vec3::new(0., 1., 0.), Vec3::Y),
-        ..default()
-    });
 }
 
-fn rotate(mut query: Query<&mut Transform, With<Shape>>, time: Res<Time>) {
-    for mut transform in &mut query {
-        transform.rotate_y(time.delta_seconds() / 2.);
+fn print_ball_altitude(positions: Query<&Transform, With<RigidBody>>) {
+    for transform in positions.iter() {
+        println!("Ball altitude: {}", transform.translation.y);
     }
 }
-
 fn uv_debug_texture() -> Image {
     const TEXTURE_SIZE: usize = 8;
 
@@ -106,3 +103,26 @@ fn uv_debug_texture() -> Image {
         TextureFormat::Rgba8UnormSrgb,
     )
 }
+
+// fn handle_player_input(mut query: Query<&mut Player>, keyboard: Res<Input<KeyCode>>) {
+//     for (mut player) in query.iter_mut() {
+//         if keyboard.pressed(KeyCode::W) {
+//             player.velocity.x += player.movement_speed;
+//         }
+//         if keyboard.pressed(KeyCode::A) {
+//             player.velocity.y -= player.movement_speed;
+//         }
+//         if keyboard.pressed(KeyCode::S) {
+//             player.velocity.x -= player.movement_speed;
+//         }
+//         if keyboard.pressed(KeyCode::D) {
+//             player.velocity.y += player.movement_speed;
+//         }
+//     }
+// }
+//
+// fn update_player_position(mut query: Query<(&mut KinematicCharacterController, &Player)>) {
+//     for (mut controller, player) in query.iter_mut() {
+//         controller.custom_shape = player.velocity;
+//     }
+// }
