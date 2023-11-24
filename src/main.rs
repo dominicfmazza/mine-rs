@@ -1,7 +1,4 @@
-use bevy::{
-    prelude::*,
-    render::render_resource::{Extent3d, TextureDimension, TextureFormat},
-};
+use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
 pub mod player;
 pub mod setup;
