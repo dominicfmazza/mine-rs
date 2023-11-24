@@ -1,3 +1,4 @@
+use crate::player::{Player, PlayerCamera};
 use bevy::{
     prelude::*,
     render::render_resource::{Extent3d, TextureDimension, TextureFormat},
@@ -6,10 +7,13 @@ use bevy_rapier3d::prelude::*;
 
 pub fn setup_graphics(mut commands: Commands) {
     // Add a camera so we can see the debug-render.
-    commands.spawn(Camera3dBundle {
-        transform: Transform::from_xyz(20.0, 20.0, 10.0).looking_at(Vec3::ZERO, Vec3::Y),
-        ..Default::default()
-    });
+    commands.spawn((
+        Camera3dBundle {
+            transform: Transform::from_xyz(0.0, 50.0, 0.0).looking_at(Vec3::ZERO, Vec3::Y),
+            ..Default::default()
+        },
+        PlayerCamera,
+    ));
 }
 
 fn setup_cube(
@@ -29,7 +33,12 @@ fn setup_cube(
                 material: material.clone(),
                 ..default()
             },
+            Player,
         ))
+        .insert(KinematicCharacterController {
+            snap_to_ground: Some(CharacterLength::Absolute(0.5)),
+            ..default()
+        })
         .insert(Restitution::coefficient(0.7))
         .insert(TransformBundle::from(Transform::from_xyz(0.0, 4.0, 0.0)));
 }
